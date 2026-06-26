@@ -1,0 +1,6 @@
+{
+  "name": "Quản lý Đối tượng Lang thang Đà Nẵng",
+  "description": "Hệ thống quản lý đối tượng lang thang xin ăn thành phố Đà Nẵng, hỗ trợ phân quyền nhân viên theo trung tâm, phê duyệt tài khoản, theo dõi lịch sử vào ra và đồng bộ Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
