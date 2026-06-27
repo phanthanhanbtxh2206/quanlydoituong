@@ -507,6 +507,62 @@ app.post("/api/auth/register", (req, res) => {
   res.json({ message: "Đăng ký thành công! Vui lòng chờ quản trị viên Sở Y tế phê duyệt tài khoản." });
 });
 
+// 2.5 DB Auto-Backup & Restore Endpoints
+app.get("/api/db/status", (req, res) => {
+  const db = readDB();
+  res.json({
+    initialized: db.subjects.length > 0 || db.users.length > 1, // more than the default admin user
+    countSubjects: db.subjects.length,
+    countUsers: db.users.length,
+    countCenters: db.centers.length
+  });
+});
+
+app.post("/api/db/restore", (req, res) => {
+  const { users, centers, subjects, sheetsConfig } = req.body;
+  if (!users && !centers && !subjects && !sheetsConfig) {
+    return res.status(400).json({ message: "Dữ liệu khôi phục không hợp lệ" });
+  }
+
+  const db = readDB();
+  
+  // Only restore if the incoming data is richer
+  if (subjects && Array.isArray(subjects) && subjects.length > 0) {
+    db.subjects = subjects;
+  }
+  if (users && Array.isArray(users) && users.length > 0) {
+    // Merge users, keeping existing users
+    const mergedUsers = [...db.users];
+    for (const u of users) {
+      if (!mergedUsers.some(existingUser => existingUser.id === u.id || existingUser.username === u.username)) {
+        mergedUsers.push(u);
+      }
+    }
+    db.users = mergedUsers;
+  }
+  if (centers && Array.isArray(centers) && centers.length > 0) {
+    // Merge centers
+    const mergedCenters = [...db.centers];
+    for (const c of centers) {
+      if (!mergedCenters.some(existingCenter => existingCenter.id === c.id)) {
+        mergedCenters.push(c);
+      }
+    }
+    db.centers = mergedCenters;
+  }
+  if (sheetsConfig && sheetsConfig.spreadsheetId) {
+    db.sheetsConfig = sheetsConfig;
+  }
+
+  writeDB(db);
+  console.log(`[Auto-Restore] Successfully restored database from client backup: ${db.subjects.length} subjects, ${db.users.length} users.`);
+  res.json({
+    success: true,
+    countSubjects: db.subjects.length,
+    countUsers: db.users.length
+  });
+});
+
 // 3. Auth Endpoint: Me
 app.get("/api/auth/me", (req, res) => {
   const user = authenticate(req);

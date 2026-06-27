@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User accounts in the system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string" },
+        "centerId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "username", "fullName", "role"]
+    },
+    "SocialCenter": {
+      "title": "SocialCenter",
+      "description": "Social centers in the system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "BeggingSubject": {
+      "title": "BeggingSubject",
+      "description": "Begging subjects or homeless individuals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "dob": { "type": "string" },
+        "gender": { "type": "string" },
+        "hometown": { "type": "string" },
+        "characteristics": { "type": "string" },
+        "avatar": { "type": "string" },
+        "status": { "type": "string" },
+        "lastEntryDate": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "fullName", "dob"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Collection of user accounts"
+    },
+    "centers": {
+      "schema": "SocialCenter",
+      "description": "Collection of social centers"
+    },
+    "subjects": {
+      "schema": "BeggingSubject",
+      "description": "Collection of begging/homeless subjects"
+    }
+  }
+}

@@ -17,6 +17,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('danang_social_token'));
   const [loadingUser, setLoadingUser] = useState(true);
+  const [restoringDB, setRestoringDB] = useState(false);
 
   // App navigation state
   const [view, setView] = useState<'dashboard' | 'admin' | 'sheets' | 'detail' | 'stats'>('dashboard');
@@ -52,9 +53,75 @@ export default function App() {
   const [regError, setRegError] = useState('');
   const [regSuccess, setRegSuccess] = useState('');
 
-  // Auto-verify auth token on mount
+  // Helper to save browser-side local backup
+  const saveLocalBackup = (updatedSubjects?: any[], updatedCenters?: SocialCenter[]) => {
+    try {
+      const backupData = {
+        subjects: updatedSubjects || subjects,
+        centers: updatedCenters || centers,
+        timestamp: new Date().toISOString()
+      };
+      // Keep existing backup users if not provided to preserve user details
+      const existingBackupStr = localStorage.getItem('danang_social_db_backup');
+      const finalBackup = { ...backupData, users: [] as any[] };
+      if (existingBackupStr) {
+        try {
+          const existing = JSON.parse(existingBackupStr);
+          if (existing.users) finalBackup.users = existing.users;
+        } catch (_) {}
+      }
+      localStorage.setItem('danang_social_db_backup', JSON.stringify(finalBackup));
+    } catch (err) {
+      console.error('Failed to save local database backup:', err);
+    }
+  };
+
+  // Safe Sync & Auto-Restore Workflow from browser to server
+  const syncAndRestoreDatabase = async () => {
+    try {
+      const statusRes = await fetch(getApiUrl('/api/db/status'));
+      if (!statusRes.ok) return;
+      const statusData = await statusRes.json();
+
+      const localBackupStr = localStorage.getItem('danang_social_db_backup');
+      if (!statusData.initialized && localBackupStr) {
+        console.log('Server database restarted and empty. Attempting auto-restore from browser backup...');
+        setRestoringDB(true);
+        const backupData = JSON.parse(localBackupStr);
+        
+        const restoreRes = await fetch(getApiUrl('/api/db/restore'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            subjects: backupData.subjects || [],
+            users: backupData.users || [],
+            centers: backupData.centers || []
+          })
+        });
+
+        if (restoreRes.ok) {
+          console.log('Database successfully restored from browser-side local backup!');
+        }
+      }
+    } catch (err) {
+      console.error('Error in syncAndRestoreDatabase:', err);
+    } finally {
+      setRestoringDB(false);
+    }
+  };
+
+  // Auto-verify auth token on mount & trigger sync check
   useEffect(() => {
-    async function verifyUser() {
+    async function verifyAndRestore() {
+      // 1. Run sync and restore check
+      await syncAndRestoreDatabase();
+      
+      // 2. Load centers
+      await loadCenters();
+
+      // 3. Verify user
       if (!token) {
         setLoadingUser(false);
         return;
@@ -70,7 +137,6 @@ export default function App() {
           const userData = await res.json();
           setUser(userData);
         } else {
-          // Token stale or user deleted
           handleLogout();
         }
       } catch (err) {
@@ -80,7 +146,7 @@ export default function App() {
       }
     }
 
-    verifyUser();
+    verifyAndRestore();
   }, [token]);
 
   // Load Centers List
@@ -90,15 +156,12 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setCenters(data);
+        saveLocalBackup(undefined, data);
       }
     } catch (err) {
       console.error('Error loading centers:', err);
     }
   };
-
-  useEffect(() => {
-    loadCenters();
-  }, []);
 
   // Fetch subjects with active filters
   const loadSubjects = async () => {
@@ -120,6 +183,7 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setSubjects(data);
+        saveLocalBackup(data);
       }
     } catch (err) {
       console.error('Error fetching subjects:', err);
@@ -129,10 +193,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user && !restoringDB) {
       loadSubjects();
     }
-  }, [user, search, filterCenter, filterStatus, filterHometown]);
+  }, [user, search, filterCenter, filterStatus, filterHometown, restoringDB]);
 
   // Sort subjects based on status (ACTIVE first) and last entry date (newest first)
   const sortedSubjects = [...subjects].sort((a, b) => {
@@ -250,11 +314,13 @@ export default function App() {
     }
   };
 
-  if (loadingUser) {
+  if (loadingUser || restoringDB) {
     return (
       <div id="app-loading-screen" className="fixed inset-0 bg-slate-50 flex flex-col items-center justify-center space-y-4">
         <Loader2 className="w-10 h-10 animate-spin text-blue-700" />
-        <span className="text-sm font-semibold text-slate-600 font-sans">Sở Y tế Đà Nẵng - Đang đồng bộ hệ thống...</span>
+        <span className="text-sm font-semibold text-slate-600 font-sans">
+          {restoringDB ? "Sở Y tế Đà Nẵng - Đang tự động khôi phục dữ liệu từ bản sao lưu..." : "Sở Y tế Đà Nẵng - Đang đồng bộ hệ thống..."}
+        </span>
       </div>
     );
   }
