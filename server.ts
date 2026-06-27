@@ -1,12 +1,38 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import { initializeApp, getApps, getApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { createServer as createViteServer } from "vite";
 import { User, SocialCenter, BeggingSubject, SubjectEntry, GoogleSheetsConfig } from "./src/types";
 
 const app = express();
 const PORT = 3000;
 const DB_FILE = path.join(process.cwd(), "data-store.json");
+
+let currentDB: DatabaseSchema = {
+  users: [],
+  centers: [],
+  subjects: [],
+  sheetsConfig: {
+    spreadsheetId: "",
+    sheetName: "DanhSachDoiTuong",
+    syncEnabled: false,
+    lastSyncedAt: null
+  }
+};
+
+let previousDB: DatabaseSchema = {
+  users: [],
+  centers: [],
+  subjects: [],
+  sheetsConfig: {
+    spreadsheetId: "",
+    sheetName: "DanhSachDoiTuong",
+    syncEnabled: false,
+    lastSyncedAt: null
+  }
+};
 
 app.use(express.json({ limit: "50mb" })); // Support large base64 image uploads
 
@@ -115,18 +141,8 @@ const DEFAULT_SUBJECTS: BeggingSubject[] = [
   }
 ];
 
-function readDB(): DatabaseSchema {
-  try {
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, "utf-8");
-      return JSON.parse(raw);
-    }
-  } catch (err) {
-    console.error("Error reading database file, using defaults:", err);
-  }
-
-  // Generate initial seeding
-  const initialDB: DatabaseSchema = {
+function getInitialDB(): DatabaseSchema {
+  return {
     users: [
       {
         id: "usr-admin",
@@ -186,21 +202,210 @@ function readDB(): DatabaseSchema {
       lastSyncedAt: null
     }
   };
-
-  writeDB(initialDB);
-  return initialDB;
 }
 
-function writeDB(data: DatabaseSchema) {
+async function initFirestore() {
   try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (!fs.existsSync(configPath)) {
+      console.warn("No firebase-applet-config.json found, using in-memory mock database.");
+      currentDB = getInitialDB();
+      previousDB = JSON.parse(JSON.stringify(currentDB));
+      return;
+    }
+
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    if (getApps().length === 0) {
+      initializeApp({
+        projectId: firebaseConfig.projectId
+      });
+    }
+
+    const firestoreDb = firebaseConfig.firestoreDatabaseId 
+      ? getFirestore(getApp(), firebaseConfig.firestoreDatabaseId)
+      : getFirestore();
+
+    console.log("Firestore successfully initialized. Loading data...");
+
+    // Load users
+    const usersSnapshot = await firestoreDb.collection("users").get();
+    const usersList: any[] = [];
+    usersSnapshot.forEach(doc => {
+      usersList.push(doc.data());
+    });
+
+    // Load centers
+    const centersSnapshot = await firestoreDb.collection("centers").get();
+    const centersList: any[] = [];
+    centersSnapshot.forEach(doc => {
+      centersList.push(doc.data());
+    });
+
+    // Load subjects
+    const subjectsSnapshot = await firestoreDb.collection("subjects").get();
+    const subjectsList: any[] = [];
+    subjectsSnapshot.forEach(doc => {
+      subjectsList.push(doc.data());
+    });
+
+    // Load sheetsConfig
+    const configDoc = await firestoreDb.collection("config").doc("sheetsConfig").get();
+    let sheetsConfig = configDoc.exists ? configDoc.data() : null;
+
+    // If Firestore has no users, it means it's a fresh database. We need to seed it with defaults!
+    if (usersList.length === 0 && centersList.length === 0 && subjectsList.length === 0) {
+      console.log("Firestore is empty. Seeding initial default database...");
+      const initialDB = getInitialDB();
+      
+      // Seed users
+      for (const u of initialDB.users) {
+        await firestoreDb.collection("users").doc(u.id).set(u);
+      }
+      // Seed centers
+      for (const c of initialDB.centers) {
+        await firestoreDb.collection("centers").doc(c.id).set(c);
+      }
+      // Seed subjects
+      for (const s of initialDB.subjects) {
+        await firestoreDb.collection("subjects").doc(s.id).set(s);
+      }
+      // Seed sheetsConfig
+      await firestoreDb.collection("config").doc("sheetsConfig").set(initialDB.sheetsConfig);
+
+      currentDB = initialDB;
+    } else {
+      currentDB = {
+        users: usersList.length > 0 ? usersList : getInitialDB().users,
+        centers: centersList.length > 0 ? centersList : getInitialDB().centers,
+        subjects: subjectsList,
+        sheetsConfig: sheetsConfig ? (sheetsConfig as GoogleSheetsConfig) : getInitialDB().sheetsConfig
+      };
+      console.log(`Loaded from Firestore: ${currentDB.users.length} users, ${currentDB.centers.length} centers, ${currentDB.subjects.length} subjects.`);
+    }
+
+    previousDB = JSON.parse(JSON.stringify(currentDB));
   } catch (err) {
-    console.error("Error writing database file:", err);
+    console.error("Failed to initialize or load Firestore:", err);
+    // Fallback to local storage
+    try {
+      if (fs.existsSync(DB_FILE)) {
+        const raw = fs.readFileSync(DB_FILE, "utf-8");
+        currentDB = JSON.parse(raw);
+      } else {
+        currentDB = getInitialDB();
+      }
+    } catch (localErr) {
+      currentDB = getInitialDB();
+    }
+    previousDB = JSON.parse(JSON.stringify(currentDB));
   }
 }
 
-// Ensure database file is initialized
-readDB();
+async function syncFirestoreDiff() {
+  try {
+    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (!fs.existsSync(configPath)) return;
+
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    if (getApps().length === 0) {
+      initializeApp({
+        projectId: firebaseConfig.projectId
+      });
+    }
+    const firestoreDb = firebaseConfig.firestoreDatabaseId 
+      ? getFirestore(getApp(), firebaseConfig.firestoreDatabaseId)
+      : getFirestore();
+
+    // Sync Users
+    const currentUsers = currentDB.users;
+    const previousUsers = previousDB.users;
+
+    for (const u of currentUsers) {
+      const prev = previousUsers.find(p => p.id === u.id);
+      if (!prev || JSON.stringify(prev) !== JSON.stringify(u)) {
+        await firestoreDb.collection("users").doc(u.id).set(u);
+      }
+    }
+    for (const p of previousUsers) {
+      if (!currentUsers.some(u => u.id === p.id)) {
+        await firestoreDb.collection("users").doc(p.id).delete();
+      }
+    }
+
+    // Sync Centers
+    const currentCenters = currentDB.centers;
+    const previousCenters = previousDB.centers;
+
+    for (const c of currentCenters) {
+      const prev = previousCenters.find(p => p.id === c.id);
+      if (!prev || JSON.stringify(prev) !== JSON.stringify(c)) {
+        await firestoreDb.collection("centers").doc(c.id).set(c);
+      }
+    }
+    for (const p of previousCenters) {
+      if (!currentCenters.some(c => c.id === p.id)) {
+        await firestoreDb.collection("centers").doc(p.id).delete();
+      }
+    }
+
+    // Sync Subjects
+    const currentSubjects = currentDB.subjects;
+    const previousSubjects = previousDB.subjects;
+
+    for (const s of currentSubjects) {
+      const prev = previousSubjects.find(p => p.id === s.id);
+      if (!prev || JSON.stringify(prev) !== JSON.stringify(s)) {
+        await firestoreDb.collection("subjects").doc(s.id).set(s);
+      }
+    }
+    for (const p of previousSubjects) {
+      if (!currentSubjects.some(s => s.id === p.id)) {
+        await firestoreDb.collection("subjects").doc(p.id).delete();
+      }
+    }
+
+    // Sync Config
+    if (JSON.stringify(currentDB.sheetsConfig) !== JSON.stringify(previousDB.sheetsConfig)) {
+      await firestoreDb.collection("config").doc("sheetsConfig").set(currentDB.sheetsConfig);
+    }
+
+    previousDB = JSON.parse(JSON.stringify(currentDB));
+  } catch (err) {
+    console.error("Error during Firestore background diff sync:", err);
+  }
+}
+
+function readDB(): DatabaseSchema {
+  if (currentDB.users.length === 0) {
+    try {
+      if (fs.existsSync(DB_FILE)) {
+        const raw = fs.readFileSync(DB_FILE, "utf-8");
+        currentDB = JSON.parse(raw);
+        previousDB = JSON.parse(JSON.stringify(currentDB));
+      } else {
+        currentDB = getInitialDB();
+        previousDB = JSON.parse(JSON.stringify(currentDB));
+      }
+    } catch (e) {
+      currentDB = getInitialDB();
+      previousDB = JSON.parse(JSON.stringify(currentDB));
+    }
+  }
+  return currentDB;
+}
+
+function writeDB(data: DatabaseSchema) {
+  currentDB = data;
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Error writing database backup file:", err);
+  }
+
+  syncFirestoreDiff().catch(err => {
+    console.error("Firestore background sync failed:", err);
+  });
+}
 
 // Helper to authenticate request
 function authenticate(req: express.Request): User | null {
@@ -1548,6 +1753,8 @@ async function autoRestoreFromSheetsOnBoot() {
 // VITE DEV SERVER / PRODUCTION CONFIGURATION
 // --------------------------------------------------
 async function startServer() {
+  await initFirestore();
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
