@@ -5,7 +5,7 @@ import SubjectDetail from './components/SubjectDetail';
 import AdminPortal from './components/AdminPortal';
 import SheetsSync from './components/SheetsSync';
 import StatsDashboard from './components/StatsDashboard';
-import { getApiUrl } from './utils/api';
+import { getApiUrl, formatDate } from './utils/api';
 import { 
   Building2, Search, Filter, Plus, FileSpreadsheet, Shield, LogOut, 
   UserPlus, LogIn, Calendar, MapPin, CheckCircle2, AlertCircle, Users,
@@ -133,6 +133,27 @@ export default function App() {
       loadSubjects();
     }
   }, [user, search, filterCenter, filterStatus, filterHometown]);
+
+  // Sort subjects based on status (ACTIVE first) and last entry date (newest first)
+  const sortedSubjects = [...subjects].sort((a, b) => {
+    const aActive = a.currentStatus === 'ACTIVE' ? 1 : 0;
+    const bActive = b.currentStatus === 'ACTIVE' ? 1 : 0;
+    
+    if (aActive !== bActive) {
+      return bActive - aActive; // ACTIVE (1) comes before others/RETURNED (0)
+    }
+    
+    // Sort by lastEntryDate descending (newest first)
+    const dateA = a.lastEntryDate || '';
+    const dateB = b.lastEntryDate || '';
+    
+    if (dateA && dateB) {
+      return dateB.localeCompare(dateA);
+    }
+    if (dateA) return -1;
+    if (dateB) return 1;
+    return 0;
+  });
 
   // Handle Login
   const handleLogin = async (e: React.FormEvent) => {
@@ -687,7 +708,7 @@ export default function App() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {subjects.map((sub: any) => {
+                {sortedSubjects.map((sub: any) => {
                   const hasPerm = isAdmin || sub.centerId === user.centerId;
                   const isCurrentActive = sub.currentStatus === 'ACTIVE';
 
@@ -727,7 +748,7 @@ export default function App() {
                             </h3>
 
                             <span className="block text-xs text-slate-500 mt-0.5 font-medium">
-                              Sinh năm: {sub.dob ? new Date(sub.dob).getFullYear() : 'N/A'} ({sub.dob ? new Date().getFullYear() - new Date(sub.dob).getFullYear() : 'N/A'} tuổi) • Giới tính: {sub.gender || 'Nam'}
+                              Ngày sinh: {sub.dob ? formatDate(sub.dob) : 'N/A'} ({sub.dob ? new Date().getFullYear() - new Date(sub.dob).getFullYear() : 'N/A'} tuổi) • Giới tính: {sub.gender || 'Nam'}
                             </span>
                           </div>
                         </div>
@@ -746,7 +767,7 @@ export default function App() {
                           {sub.lastEntryDate && (
                             <div className="flex items-center gap-1.5">
                               <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span>Đợt gần nhất: <strong className="text-slate-700">{sub.lastEntryDate}</strong></span>
+                              <span>Đợt gần nhất: <strong className="text-slate-700">{formatDate(sub.lastEntryDate)}</strong></span>
                             </div>
                           )}
                         </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BeggingSubject, SubjectEntry, User } from '../types';
 import { X, Calendar, MapPin, Users, Building, Plus, Edit2, Trash2, ArrowLeft, CheckCircle2, AlertCircle, FileText, Loader2 } from 'lucide-react';
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, formatDate } from '../utils/api';
 
 interface SubjectDetailProps {
   user: User;
@@ -349,7 +349,7 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
               <div>
                 <span className="block text-xs text-slate-400">Ngày sinh (Tuổi)</span>
                 <span className="text-sm font-medium text-slate-800">
-                  {subject.dob} ({new Date().getFullYear() - new Date(subject.dob).getFullYear()} tuổi)
+                  {formatDate(subject.dob)} ({new Date().getFullYear() - new Date(subject.dob).getFullYear()} tuổi)
                 </span>
               </div>
             </div>
@@ -637,7 +637,7 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
                           </span>
                           <span className="text-xs font-mono font-semibold text-slate-600 flex items-center gap-1">
                             <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                            {entry.entryDate} {entry.exitDate ? `đến ${entry.exitDate}` : '(Đang lưu trú)'}
+                            {formatDate(entry.entryDate)} {entry.exitDate ? `đến ${formatDate(entry.exitDate)}` : '(Đang lưu trú)'}
                           </span>
                         </div>
 
