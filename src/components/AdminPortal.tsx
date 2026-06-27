@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, SocialCenter } from '../types';
 import { Shield, Check, X, Trash2, Edit2, UserCheck, UserMinus, AlertCircle, Loader2 } from 'lucide-react';
 import { getApiUrl } from '../utils/api';
+import ConfirmModal from './ConfirmModal';
 
 interface AdminPortalProps {
   currentUser: User;
@@ -13,6 +14,7 @@ export default function AdminPortal({ currentUser, centers }: AdminPortalProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<{ id: string; name: string } | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -91,10 +93,14 @@ export default function AdminPortal({ currentUser, centers }: AdminPortalProps) 
     }
   };
 
-  const handleDeleteUser = async (userId: string, name: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN tài khoản của cán bộ "${name}"? Thao tác này không thể khôi phục.`)) {
-      return;
-    }
+  const handleDeleteUser = (userId: string, name: string) => {
+    setDeleteConfirmUser({ id: userId, name });
+  };
+
+  const executeDeleteUser = async () => {
+    if (!deleteConfirmUser) return;
+    const { id: userId } = deleteConfirmUser;
+    setDeleteConfirmUser(null);
 
     setActionLoading(userId);
     try {
@@ -325,6 +331,17 @@ export default function AdminPortal({ currentUser, centers }: AdminPortalProps) 
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteConfirmUser !== null}
+        title="Xóa tài khoản cán bộ"
+        message={`Bạn có chắc chắn muốn XÓA VĨNH VIỄN tài khoản của cán bộ "${deleteConfirmUser?.name}"? Thao tác này không thể khôi phục và người này sẽ mất toàn bộ quyền truy cập hệ thống.`}
+        confirmText="Xóa tài khoản"
+        cancelText="Hủy bỏ"
+        type="danger"
+        onConfirm={executeDeleteUser}
+        onCancel={() => setDeleteConfirmUser(null)}
+      />
     </div>
   );
 }

@@ -1,8 +1,8 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { initializeApp, getApps, getApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore, collection, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { createServer as createViteServer } from "vite";
 import { User, SocialCenter, BeggingSubject, SubjectEntry, GoogleSheetsConfig } from "./src/types";
 
@@ -217,7 +217,10 @@ async function initFirestore() {
     const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     if (getApps().length === 0) {
       initializeApp({
-        projectId: firebaseConfig.projectId
+        apiKey: firebaseConfig.apiKey,
+        authDomain: firebaseConfig.authDomain,
+        projectId: firebaseConfig.projectId,
+        appId: firebaseConfig.appId,
       });
     }
 
@@ -228,29 +231,29 @@ async function initFirestore() {
     console.log("Firestore successfully initialized. Loading data...");
 
     // Load users
-    const usersSnapshot = await firestoreDb.collection("users").get();
+    const usersSnapshot = await getDocs(collection(firestoreDb, "users"));
     const usersList: any[] = [];
     usersSnapshot.forEach(doc => {
       usersList.push(doc.data());
     });
 
     // Load centers
-    const centersSnapshot = await firestoreDb.collection("centers").get();
+    const centersSnapshot = await getDocs(collection(firestoreDb, "centers"));
     const centersList: any[] = [];
     centersSnapshot.forEach(doc => {
       centersList.push(doc.data());
     });
 
     // Load subjects
-    const subjectsSnapshot = await firestoreDb.collection("subjects").get();
+    const subjectsSnapshot = await getDocs(collection(firestoreDb, "subjects"));
     const subjectsList: any[] = [];
     subjectsSnapshot.forEach(doc => {
       subjectsList.push(doc.data());
     });
 
     // Load sheetsConfig
-    const configDoc = await firestoreDb.collection("config").doc("sheetsConfig").get();
-    let sheetsConfig = configDoc.exists ? configDoc.data() : null;
+    const configDoc = await getDoc(doc(firestoreDb, "config", "sheetsConfig"));
+    let sheetsConfig = configDoc.exists() ? configDoc.data() : null;
 
     // If Firestore has no users, it means it's a fresh database. We need to seed it with defaults!
     if (usersList.length === 0 && centersList.length === 0 && subjectsList.length === 0) {
@@ -259,18 +262,18 @@ async function initFirestore() {
       
       // Seed users
       for (const u of initialDB.users) {
-        await firestoreDb.collection("users").doc(u.id).set(u);
+        await setDoc(doc(firestoreDb, "users", u.id), u);
       }
       // Seed centers
       for (const c of initialDB.centers) {
-        await firestoreDb.collection("centers").doc(c.id).set(c);
+        await setDoc(doc(firestoreDb, "centers", c.id), c);
       }
       // Seed subjects
       for (const s of initialDB.subjects) {
-        await firestoreDb.collection("subjects").doc(s.id).set(s);
+        await setDoc(doc(firestoreDb, "subjects", s.id), s);
       }
       // Seed sheetsConfig
-      await firestoreDb.collection("config").doc("sheetsConfig").set(initialDB.sheetsConfig);
+      await setDoc(doc(firestoreDb, "config", "sheetsConfig"), initialDB.sheetsConfig);
 
       currentDB = initialDB;
     } else {
@@ -309,7 +312,10 @@ async function syncFirestoreDiff() {
     const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     if (getApps().length === 0) {
       initializeApp({
-        projectId: firebaseConfig.projectId
+        apiKey: firebaseConfig.apiKey,
+        authDomain: firebaseConfig.authDomain,
+        projectId: firebaseConfig.projectId,
+        appId: firebaseConfig.appId,
       });
     }
     const firestoreDb = firebaseConfig.firestoreDatabaseId 
@@ -323,12 +329,12 @@ async function syncFirestoreDiff() {
     for (const u of currentUsers) {
       const prev = previousUsers.find(p => p.id === u.id);
       if (!prev || JSON.stringify(prev) !== JSON.stringify(u)) {
-        await firestoreDb.collection("users").doc(u.id).set(u);
+        await setDoc(doc(firestoreDb, "users", u.id), u);
       }
     }
     for (const p of previousUsers) {
       if (!currentUsers.some(u => u.id === p.id)) {
-        await firestoreDb.collection("users").doc(p.id).delete();
+        await deleteDoc(doc(firestoreDb, "users", p.id));
       }
     }
 
@@ -339,12 +345,12 @@ async function syncFirestoreDiff() {
     for (const c of currentCenters) {
       const prev = previousCenters.find(p => p.id === c.id);
       if (!prev || JSON.stringify(prev) !== JSON.stringify(c)) {
-        await firestoreDb.collection("centers").doc(c.id).set(c);
+        await setDoc(doc(firestoreDb, "centers", c.id), c);
       }
     }
     for (const p of previousCenters) {
       if (!currentCenters.some(c => c.id === p.id)) {
-        await firestoreDb.collection("centers").doc(p.id).delete();
+        await deleteDoc(doc(firestoreDb, "centers", p.id));
       }
     }
 
@@ -355,18 +361,18 @@ async function syncFirestoreDiff() {
     for (const s of currentSubjects) {
       const prev = previousSubjects.find(p => p.id === s.id);
       if (!prev || JSON.stringify(prev) !== JSON.stringify(s)) {
-        await firestoreDb.collection("subjects").doc(s.id).set(s);
+        await setDoc(doc(firestoreDb, "subjects", s.id), s);
       }
     }
     for (const p of previousSubjects) {
       if (!currentSubjects.some(s => s.id === p.id)) {
-        await firestoreDb.collection("subjects").doc(p.id).delete();
+        await deleteDoc(doc(firestoreDb, "subjects", p.id));
       }
     }
 
     // Sync Config
     if (JSON.stringify(currentDB.sheetsConfig) !== JSON.stringify(previousDB.sheetsConfig)) {
-      await firestoreDb.collection("config").doc("sheetsConfig").set(currentDB.sheetsConfig);
+      await setDoc(doc(firestoreDb, "config", "sheetsConfig"), currentDB.sheetsConfig);
     }
 
     previousDB = JSON.parse(JSON.stringify(currentDB));

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, GoogleSheetsConfig } from '../types';
 import { Database, FileSpreadsheet, Download, RefreshCw, Code, Clipboard, Check, HelpCircle, Loader2, Save } from 'lucide-react';
 import { getApiUrl, getApiBaseUrl } from '../utils/api';
+import ConfirmModal from './ConfirmModal';
 
 interface SheetsSyncProps {
   user: User;
@@ -17,6 +18,7 @@ export default function SheetsSync({ user }: SheetsSyncProps) {
   const [spreadsheetIdInput, setSpreadsheetIdInput] = useState('');
   const [sheetNameInput, setSheetNameInput] = useState('DanhSachDoiTuong');
   const [syncEnabledInput, setSyncEnabledInput] = useState(false);
+  const [showConfirmRestore, setShowConfirmRestore] = useState(false);
 
   const [csvPasteData, setCsvPasteData] = useState('');
   const [importStatus, setImportStatus] = useState({ success: false, message: '' });
@@ -31,16 +33,16 @@ export default function SheetsSync({ user }: SheetsSyncProps) {
 
   const isAdmin = user.role === 'ADMIN';
 
-  const handleRestoreFromSheets = async () => {
+  const handleRestoreFromSheets = () => {
     if (!config.spreadsheetId) {
       alert('Vui lòng lưu cấu hình Spreadsheet ID trước khi thực hiện khôi phục.');
       return;
     }
-    
-    if (!window.confirm('Bạn có chắc chắn muốn khôi phục toàn bộ danh sách đối tượng trực tiếp từ Google Sheet không? Hệ thống sẽ tải dữ liệu thời gian thực hiện tại và cập nhật đè các thay đổi.')) {
-      return;
-    }
+    setShowConfirmRestore(true);
+  };
 
+  const executeRestoreFromSheets = async () => {
+    setShowConfirmRestore(false);
     setRestoreLoading(true);
     setRestoreStatus({ success: false, message: '' });
 
@@ -670,6 +672,17 @@ function onOpen() {
         </div>
 
       </div>
+
+      <ConfirmModal
+        isOpen={showConfirmRestore}
+        title="Khôi phục danh sách từ Google Sheets"
+        message="Bạn có chắc chắn muốn khôi phục toàn bộ danh sách đối tượng trực tiếp từ Google Sheet không? Hệ thống sẽ tải dữ liệu thời gian thực hiện tại và cập nhật đè các thay đổi hiện tại trên ứng dụng."
+        confirmText="Tải & Khôi phục"
+        cancelText="Hủy bỏ"
+        type="warning"
+        onConfirm={executeRestoreFromSheets}
+        onCancel={() => setShowConfirmRestore(false)}
+      />
     </div>
   );
 }

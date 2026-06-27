@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BeggingSubject, SubjectEntry, User } from '../types';
 import { X, Calendar, MapPin, Users, Building, Plus, Edit2, Trash2, ArrowLeft, CheckCircle2, AlertCircle, FileText, Loader2 } from 'lucide-react';
 import { getApiUrl, formatDate } from '../utils/api';
+import ConfirmModal from './ConfirmModal';
 
 interface SubjectDetailProps {
   user: User;
@@ -15,6 +16,10 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
   const [subject, setSubject] = useState<BeggingSubject | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Custom ConfirmModal states
+  const [deleteConfirmSubject, setDeleteConfirmSubject] = useState(false);
+  const [deleteConfirmHistoryId, setDeleteConfirmHistoryId] = useState<string | null>(null);
 
   // History adding form
   const [showAddHistory, setShowAddHistory] = useState(false);
@@ -144,10 +149,14 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
   };
 
   // Delete a history record
-  const handleDeleteHistory = async (historyId: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa dòng lịch sử tiếp nhận này? Thao tác này sẽ cập nhật lại tổng số lần vào trung tâm.')) {
-      return;
-    }
+  const handleDeleteHistory = (historyId: string) => {
+    setDeleteConfirmHistoryId(historyId);
+  };
+
+  const executeDeleteHistory = async () => {
+    if (!deleteConfirmHistoryId) return;
+    const historyId = deleteConfirmHistoryId;
+    setDeleteConfirmHistoryId(null);
 
     try {
       const res = await fetch(getApiUrl(`/api/subjects/${subjectId}/history/${historyId}`), {
@@ -169,8 +178,14 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
 
   // Quick check out/release subject
   const handleQuickRelease = async (historyId: string) => {
-    const releaseDate = prompt('Nhập ngày bàn giao/cho về địa phương (YYYY-MM-DD):', new Date().toISOString().substring(0, 10));
-    if (!releaseDate) return;
+    let releaseDate = new Date().toISOString().substring(0, 10);
+    try {
+      const userPrompt = prompt('Nhập ngày bàn giao/cho về địa phương (YYYY-MM-DD):', releaseDate);
+      if (userPrompt === null) return; // User cancelled
+      if (userPrompt) releaseDate = userPrompt;
+    } catch (e) {
+      console.warn("Prompt is restricted in this environment, using default date:", releaseDate);
+    }
 
     try {
       const res = await fetch(getApiUrl(`/api/subjects/${subjectId}/history/${historyId}`), {
@@ -197,11 +212,12 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
   };
 
   // Delete entire subject
-  const handleDeleteSubject = async () => {
-    if (!window.confirm(`Bạn có chắc chắn muốn XÓA HOÀN TOÀN đối tượng ${subject?.fullName} ra khỏi hệ thống? Tất cả lịch sử lưu trú cũng sẽ bị xóa vĩnh viễn.`)) {
-      return;
-    }
+  const handleDeleteSubject = () => {
+    setDeleteConfirmSubject(true);
+  };
 
+  const executeDeleteSubject = async () => {
+    setDeleteConfirmSubject(false);
     try {
       const res = await fetch(getApiUrl(`/api/subjects/${subjectId}`), {
         method: 'DELETE',
@@ -674,6 +690,15 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
+                              <button
+                                type="button"
+                                id={`btn-delete-history-${entry.id}`}
+                                onClick={() => handleDeleteHistory(entry.id)}
+                                className="p-1 hover:bg-rose-100 text-rose-600 rounded"
+                                title="Xóa dòng lịch sử này"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           )}
                         </div>
@@ -699,6 +724,29 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
           </div>
         )}
       </div>
+
+      {/* Confirmation Modals */}
+      <ConfirmModal
+        isOpen={deleteConfirmSubject}
+        title="Xóa hồ sơ đối tượng"
+        message={`Bạn có chắc chắn muốn XÓA HOÀN TOÀN đối tượng ${subject?.fullName} ra khỏi hệ thống? Tất cả thông tin hồ sơ và lịch sử lưu trú cũng sẽ bị xóa vĩnh viễn và không thể phục hồi.`}
+        confirmText="Xóa vĩnh viễn"
+        cancelText="Hủy bỏ"
+        type="danger"
+        onConfirm={executeDeleteSubject}
+        onCancel={() => setDeleteConfirmSubject(false)}
+      />
+
+      <ConfirmModal
+        isOpen={deleteConfirmHistoryId !== null}
+        title="Xóa đợt lưu trú"
+        message="Bạn có chắc chắn muốn xóa dòng lịch sử tiếp nhận này? Thao tác này sẽ cập nhật lại tổng số lần vào trung tâm của đối tượng này."
+        confirmText="Xóa dòng lịch sử"
+        cancelText="Hủy bỏ"
+        type="danger"
+        onConfirm={executeDeleteHistory}
+        onCancel={() => setDeleteConfirmHistoryId(null)}
+      />
     </div>
   );
 }
