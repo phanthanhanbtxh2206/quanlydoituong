@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BeggingSubject, SocialCenter, User } from '../types';
 import { X, Save, Camera, HelpCircle, Loader2 } from 'lucide-react';
+import { getApiUrl } from '../utils/api';
 
 interface SubjectFormProps {
   user: User;
@@ -130,7 +131,7 @@ export default function SubjectForm({ user, subject, centers, onClose, onSave }:
       const url = isEditing ? `/api/subjects/${subject.id}` : '/api/subjects';
       const method = isEditing ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await fetch(getApiUrl(url), {
         method,
         headers: {
           'Content-Type': 'application/json',

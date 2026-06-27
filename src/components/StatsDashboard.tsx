@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BeggingSubject, SocialCenter, User } from '../types';
 import { BarChart3, Calendar, CheckCircle, Clock, AlertTriangle, Users, HelpCircle, RefreshCw, Layers, Search, Eye } from 'lucide-react';
+import { getApiUrl } from '../utils/api';
 
 interface StatsDashboardProps {
   user: User;
@@ -30,7 +31,7 @@ export default function StatsDashboard({ user, centers }: StatsDashboardProps) {
   const loadAllSubjects = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/subjects', {
+      const res = await fetch(getApiUrl('/api/subjects'), {
         headers: {
           'Authorization': `Bearer ${user.id}`
         }

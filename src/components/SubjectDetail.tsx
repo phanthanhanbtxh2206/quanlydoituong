@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BeggingSubject, SubjectEntry, User } from '../types';
 import { X, Calendar, MapPin, Users, Building, Plus, Edit2, Trash2, ArrowLeft, CheckCircle2, AlertCircle, FileText, Loader2 } from 'lucide-react';
+import { getApiUrl } from '../utils/api';
 
 interface SubjectDetailProps {
   user: User;
@@ -49,7 +50,7 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
     }
     setEditLoading(true);
     try {
-      const res = await fetch(`/api/subjects/${subjectId}/history/${historyId}`, {
+      const res = await fetch(getApiUrl(`/api/subjects/${subjectId}/history/${historyId}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -80,7 +81,7 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
   const fetchSubject = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/subjects/${subjectId}`, {
+      const res = await fetch(getApiUrl(`/api/subjects/${subjectId}`), {
         headers: {
           'Authorization': `Bearer ${user.id}`
         }
@@ -108,7 +109,7 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
 
     setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/subjects/${subjectId}/history`, {
+      const res = await fetch(getApiUrl(`/api/subjects/${subjectId}/history`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -149,7 +150,7 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
     }
 
     try {
-      const res = await fetch(`/api/subjects/${subjectId}/history/${historyId}`, {
+      const res = await fetch(getApiUrl(`/api/subjects/${subjectId}/history/${historyId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${user.id}`
@@ -172,7 +173,7 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
     if (!releaseDate) return;
 
     try {
-      const res = await fetch(`/api/subjects/${subjectId}/history/${historyId}`, {
+      const res = await fetch(getApiUrl(`/api/subjects/${subjectId}/history/${historyId}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -202,7 +203,7 @@ export default function SubjectDetail({ user, subjectId, onClose, onRefresh, onE
     }
 
     try {
-      const res = await fetch(`/api/subjects/${subjectId}`, {
+      const res = await fetch(getApiUrl(`/api/subjects/${subjectId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${user.id}`

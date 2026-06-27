@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, GoogleSheetsConfig } from '../types';
 import { Database, FileSpreadsheet, Download, RefreshCw, Code, Clipboard, Check, HelpCircle, Loader2, Save } from 'lucide-react';
+import { getApiUrl, getApiBaseUrl } from '../utils/api';
 
 interface SheetsSyncProps {
   user: User;
@@ -44,7 +45,7 @@ export default function SheetsSync({ user }: SheetsSyncProps) {
     setRestoreStatus({ success: false, message: '' });
 
     try {
-      const res = await fetch('/api/sheets/restore', {
+      const res = await fetch(getApiUrl('/api/sheets/restore'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,7 +69,7 @@ export default function SheetsSync({ user }: SheetsSyncProps) {
   const fetchConfig = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/sheets/config', {
+      const res = await fetch(getApiUrl('/api/sheets/config'), {
         headers: {
           'Authorization': `Bearer ${user.id}`
         }
@@ -97,7 +98,7 @@ export default function SheetsSync({ user }: SheetsSyncProps) {
     e.preventDefault();
     setSaveLoading(true);
     try {
-      const res = await fetch('/api/sheets/config', {
+      const res = await fetch(getApiUrl('/api/sheets/config'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -130,7 +131,7 @@ export default function SheetsSync({ user }: SheetsSyncProps) {
     setImportStatus({ success: false, message: '' });
 
     try {
-      const res = await fetch('/api/sheets/import', {
+      const res = await fetch(getApiUrl('/api/sheets/import'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -153,7 +154,7 @@ export default function SheetsSync({ user }: SheetsSyncProps) {
   };
 
   // Generate dynamic Google Apps Script code for their Spreadsheet based on current origin!
-  const appOrigin = window.location.origin;
+  const appOrigin = getApiBaseUrl() || window.location.origin;
   const appsScriptCode = `/**
  * Google Apps Script - Đồng bộ hóa danh sách đối tượng và cán bộ đăng ký Đà Nẵng Social
  * Tự động kết nối, lấy dữ liệu thời gian thực từ ứng dụng Đà Nẵng Social và dán vào Google Sheet.
@@ -357,7 +358,7 @@ function onOpen() {
         </div>
         <div className="flex gap-2 text-slate-950">
           <a
-            href="/api/sheets/export"
+            href={getApiUrl('/api/sheets/export')}
             download="danh-sach-doi-tuong-lang-thang.csv"
             id="btn-download-csv-top"
             className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-lg transition-colors min-h-[44px]"

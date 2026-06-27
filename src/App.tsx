@@ -5,6 +5,7 @@ import SubjectDetail from './components/SubjectDetail';
 import AdminPortal from './components/AdminPortal';
 import SheetsSync from './components/SheetsSync';
 import StatsDashboard from './components/StatsDashboard';
+import { getApiUrl } from './utils/api';
 import { 
   Building2, Search, Filter, Plus, FileSpreadsheet, Shield, LogOut, 
   UserPlus, LogIn, Calendar, MapPin, CheckCircle2, AlertCircle, Users,
@@ -60,7 +61,7 @@ export default function App() {
       }
 
       try {
-        const res = await fetch('/api/auth/me', {
+        const res = await fetch(getApiUrl('/api/auth/me'), {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -85,7 +86,7 @@ export default function App() {
   // Load Centers List
   const loadCenters = async () => {
     try {
-      const res = await fetch('/api/centers');
+      const res = await fetch(getApiUrl('/api/centers'));
       if (res.ok) {
         const data = await res.json();
         setCenters(data);
@@ -111,7 +112,7 @@ export default function App() {
       if (filterStatus && filterStatus !== 'all') params.append('status', filterStatus);
       if (filterHometown) params.append('hometown', filterHometown);
 
-      const res = await fetch(`/api/subjects?${params.toString()}`, {
+      const res = await fetch(getApiUrl(`/api/subjects?${params.toString()}`), {
         headers: {
           'Authorization': `Bearer ${user.id}`
         }
@@ -143,7 +144,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(getApiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: loginUsername, password: loginPassword })
@@ -176,7 +177,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(getApiUrl('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

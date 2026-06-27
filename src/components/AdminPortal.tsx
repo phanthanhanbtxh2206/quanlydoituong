@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, SocialCenter } from '../types';
 import { Shield, Check, X, Trash2, Edit2, UserCheck, UserMinus, AlertCircle, Loader2 } from 'lucide-react';
+import { getApiUrl } from '../utils/api';
 
 interface AdminPortalProps {
   currentUser: User;
@@ -16,7 +17,7 @@ export default function AdminPortal({ currentUser, centers }: AdminPortalProps) 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/users', {
+      const res = await fetch(getApiUrl('/api/users'), {
         headers: {
           'Authorization': `Bearer ${currentUser.id}`
         }
@@ -38,7 +39,7 @@ export default function AdminPortal({ currentUser, centers }: AdminPortalProps) 
   const handleApprove = async (userId: string, approved: boolean, currentCenterId?: string, currentRole?: string) => {
     setActionLoading(userId);
     try {
-      const res = await fetch('/api/users/approve', {
+      const res = await fetch(getApiUrl('/api/users/approve'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -66,7 +67,7 @@ export default function AdminPortal({ currentUser, centers }: AdminPortalProps) 
   const handleUpdateRoleOrCenter = async (userId: string, updates: { role?: string; centerId?: string }) => {
     setActionLoading(userId);
     try {
-      const res = await fetch('/api/users/approve', {
+      const res = await fetch(getApiUrl('/api/users/approve'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +98,7 @@ export default function AdminPortal({ currentUser, centers }: AdminPortalProps) 
 
     setActionLoading(userId);
     try {
-      const res = await fetch(`/api/users/${userId}`, {
+      const res = await fetch(getApiUrl(`/api/users/${userId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${currentUser.id}`
